@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mavryx</title>
+<meta name="theme-color" content="#f4f7fc">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('theme')||'auto'}catch(e){}</script>
+</head>
+<body>
+
+<main id="auth" hidden>
+  <div class="auth-card">
+    <div class="logo"><span class="mark" data-i="logo"></span><span>Mavryx</span></div>
+    <h1 id="auth-title">Welcome back</h1>
+    <p class="sub" id="auth-sub">Log in to keep listening.</p>
+    <div class="tabs" role="tablist">
+      <button type="button" data-tab="login" class="on" role="tab">Log in</button>
+      <button type="button" data-tab="signup" role="tab">Sign up</button>
+    </div>
+    <label>Email<input id="email" type="email" autocomplete="email" placeholder="you@example.com"></label>
+    <label>Password<input id="password" type="password" autocomplete="current-password" placeholder="At least 8 characters"></label>
+    <p class="error" id="auth-error" role="alert"></p>
+    <button class="primary wide" id="auth-submit" type="button">Log in</button>
+    <div class="themes" role="group" aria-label="Theme"></div>
+  </div>
+</main>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="logo"><span class="mark" data-i="logo"></span><span class="word">Mavryx</span></div>
+    <label class="search"><span data-i="search"></span><input id="q" type="search" placeholder="Search songs or artists" aria-label="Search library"></label>
+    <button id="menu-btn" class="icon-btn" data-i="more" aria-label="Open menu" aria-haspopup="dialog" aria-expanded="false"></button>
+  </header>
+
+  <section class="lib">
+    <div class="lib-head">
+      <div><h2>Your library</h2><p id="count" class="muted"></p></div>
+      <div class="actions">
+        <button class="primary" id="upload-btn" type="button"><span data-i="upload"></span>Upload</button>
+        <button class="tonal" id="link-btn" type="button"><span data-i="link"></span>Add link</button>
+        <input id="file" type="file" accept="audio/*,.mp3,.m4a,.flac,.ogg,.wav" multiple hidden>
+      </div>
+    </div>
+    <ul id="list"></ul>
+    <div id="empty" class="empty" hidden><span class="empty-ic" data-i="note"></span><b>Your library is empty</b><p>Upload songs from this device or add a link to an MP3.</p></div>
+  </section>
+</div>
+
+<footer id="mini" hidden>
+  <div class="prog"><i id="mprog"></i></div>
+  <button class="mini-info" id="expand" aria-label="Open player"><span class="art" id="m-art"></span><span class="meta"><b id="m-title"></b><small id="m-artist"></small></span></button>
+  <button class="icon-btn" id="m-play" aria-label="Play"></button>
+  <button class="icon-btn" id="m-next" data-i="next" aria-label="Next"></button>
+  <button class="icon-btn qwrap" id="m-queue" aria-label="View queue"><span data-i="queue"></span><span class="qbadge" hidden></span></button>
+  <button class="icon-btn" id="m-up" data-i="up" aria-label="Expand player"></button>
+</footer>
+
+<section id="full" aria-label="Now playing" aria-hidden="true">
+  <div class="full-top">
+    <button class="icon-btn" id="collapse" data-i="down" aria-label="Collapse player"></button>
+    <span>Now playing</span>
+    <button class="icon-btn qwrap" id="f-queue" aria-label="View queue"><span data-i="queue"></span><span class="qbadge" hidden></span></button>
+  </div>
+  <div class="big-art" id="f-art"></div>
+  <div class="f-meta"><h2 id="f-title"></h2><p id="f-artist"></p></div>
+  <div class="f-seek">
+    <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+    <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+  </div>
+  <div class="f-ctrl">
+    <button class="icon-btn" id="shuffle" data-i="shuffle" aria-label="Shuffle" aria-pressed="false"></button>
+    <button class="icon-btn" id="prev" data-i="prev" aria-label="Previous"></button>
+    <button class="play-big" id="play" aria-label="Play"></button>
+    <button class="icon-btn" id="next" data-i="next" aria-label="Next"></button>
+    <button class="icon-btn" id="loop" aria-label="Loop off" aria-pressed="false"></button>
+  </div>
+  <div class="f-extra">
+    <button class="chip" id="back10" aria-label="Back 10 seconds">−10s</button>
+    <div class="vol"><button class="icon-btn" id="mute" aria-label="Mute"></button><input id="vol" type="range" min="0" max="100" value="100" aria-label="Volume"></div>
+    <button class="chip" id="speed" aria-label="Playback speed">1×</button>
+    <button class="chip" id="fwd10" aria-label="Forward 10 seconds">+10s</button>
+  </div>
+</section>
+
+<dialog id="up-dlg">
+  <form method="dialog" class="dlg">
+    <h2>Upload songs</h2>
+    <p class="muted">Add the artist or singer for each song.</p>
+    <label>Same artist for all (optional)<input id="up-all" placeholder="e.g. Arijit Singh"></label>
+    <div id="up-rows"></div>
+    <p class="error" id="up-error" role="alert"></p>
+    <div class="row"><button class="ghost" value="cancel" formnovalidate>Cancel</button><button class="primary" id="up-save" value="default">Upload</button></div>
+  </form>
+</dialog>
+
+<dialog id="link-dlg">
+  <form method="dialog" class="dlg">
+    <h2>Add by link</h2>
+    <label>Direct link to an audio file<input id="u-url" type="url" placeholder="https://example.com/song.mp3"></label>
+    <label>Artist / singer name<input id="u-artist" placeholder="e.g. Arijit Singh"></label>
+    <label>Title (optional)<input id="u-title"></label>
+    <p class="error" id="u-error" role="alert"></p>
+    <div class="row"><button class="ghost" value="cancel" formnovalidate>Cancel</button><button class="primary" id="u-save" value="default">Add song</button></div>
+  </form>
+</dialog>
+
+<dialog id="install-dlg">
+  <form method="dialog" class="dlg">
+    <h2>Install Mavryx</h2>
+    <p class="muted" id="inst-intro"></p>
+    <ol class="steps" id="inst-steps"></ol>
+    <p class="muted fine">Installing needs the site to be opened over HTTPS (localhost works while testing).</p>
+    <div class="row"><button class="primary" value="cancel" formnovalidate>Got it</button></div>
+  </form>
+</dialog>
+
+<dialog id="keys-dlg">
+  <form method="dialog" class="dlg">
+    <h2>Keyboard controls</h2>
+    <p class="muted">Shortcuts work once a song is loaded and you are not typing in a field.</p>
+    <div class="keys" id="keys-list"></div>
+    <div class="row"><button class="primary" value="cancel" formnovalidate>Close</button></div>
+  </form>
+</dialog>
+
+<dialog id="profile-dlg">
+  <form method="dialog" class="dlg center">
+    <span class="avatar big" id="p-avatar"></span>
+    <h2 id="p-email"></h2>
+    <p class="muted" id="p-since"></p>
+    <div class="stats"><div><b id="s-all">0</b><small>Songs</small></div><div><b id="s-up">0</b><small>Uploaded</small></div><div><b id="s-link">0</b><small>Links</small></div></div>
+    <div class="row"><button class="ghost" value="cancel" formnovalidate>Close</button><button class="tonal" id="p-pass" value="x">Change password</button></div>
+  </form>
+</dialog>
+
+<dialog id="pw-dlg">
+  <form method="dialog" class="dlg">
+    <h2>Change password</h2>
+    <label>Current password<input id="pw-cur" type="password" autocomplete="current-password"></label>
+    <label>New password<input id="pw-new" type="password" autocomplete="new-password" placeholder="At least 8 characters"></label>
+    <p class="error" id="pw-error" role="alert"></p>
+    <div class="row"><button class="ghost" value="cancel" formnovalidate>Cancel</button><button class="primary" id="pw-save" value="default">Update password</button></div>
+  </form>
+</dialog>
+
+<div id="menu-back"></div>
+<aside id="menu" class="menu drawer" aria-label="Menu" aria-hidden="true">
+  <div class="drawer-head"><span>Menu</span><button class="icon-btn" id="menu-close" data-i="close" aria-label="Close menu"></button></div>
+  <div class="drawer-body">
+    <div class="menu-user"><span class="avatar" id="m-avatar"></span><div><b id="m-name"></b><small>Signed in</small></div></div>
+    <button data-act="install" class="install-btn"><span data-i="install"></span><span id="install-label">Install app</span></button>
+    <hr>
+    <button data-act="profile"><span data-i="person"></span>View profile</button>
+    <button data-act="upload"><span data-i="upload"></span>Upload songs</button>
+    <button data-act="link"><span data-i="link"></span>Add by link</button>
+    <button data-act="queue"><span data-i="queue"></span>View queue<span class="qbadge" hidden></span></button>
+    <button data-act="sort"><span data-i="sort"></span><span id="sort-label">Sort: Newest first</span></button>
+    <hr>
+    <div class="menu-theme"><span>Theme</span><div class="themes" role="group" aria-label="Theme"></div></div>
+    <hr>
+    <button data-act="controls"><span data-i="keyboard"></span>Keyboard controls</button>
+    <button data-act="password"><span data-i="lock"></span>Change password</button>
+    <hr>
+    <button data-act="logout" class="danger"><span data-i="logout"></span>Log out</button>
+  </div>
+</aside>
+
+<div id="q-back"></div>
+<aside id="queue" aria-label="Queue" aria-hidden="true">
+  <div class="q-head">
+    <h2>Queue</h2>
+    <button class="tonal" id="q-clear" type="button">Clear queue</button>
+    <button class="icon-btn" id="q-close" data-i="close" aria-label="Close queue"></button>
+  </div>
+  <div class="q-body">
+    <h3>Now playing</h3>
+    <div id="q-now"></div>
+    <h3>Next in queue <span id="q-count"></span></h3>
+    <ul class="q-list" id="q-list"></ul>
+    <p class="muted note" id="q-empty">Your queue is empty. Use the song menu to play a song next or add it to the queue.</p>
+    <h3 id="q-lib-h">Next from your library</h3>
+    <ul class="q-list" id="q-lib"></ul>
+    <p class="muted note" id="q-lib-note" hidden></p>
+  </div>
+</aside>
+
+<div id="row-menu" class="menu rmenu" hidden>
+  <button data-ra="next"><span data-i="next"></span>Play next</button>
+  <button data-ra="end"><span data-i="qadd"></span>Add to queue</button>
+  <button data-ra="rm" class="danger"><span data-i="trash"></span>Remove from library</button>
+</div>
+
+<div id="toast" role="status"></div>
+<script src="/app.js"></script>
+</body>
+</html>
