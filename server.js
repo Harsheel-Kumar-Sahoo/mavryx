@@ -31,7 +31,7 @@ const wrap = fn => (req, res) => fn(req, res).catch(e => {
   console.error(e); res.status(500).json({ error: 'Something went wrong. Try again.' });
 });
 const shape = s => ({
-  id: s._id.toString(), source: s.source, title: s.title, artist: s.artist, duration: s.duration || 0,
+  id: s._id.toString(), source: s.source, createdAt: s.createdAt, title: s.title, artist: s.artist, duration: s.duration || 0,
   src: s.source === 'url' ? s.url : `/api/stream/${s._id}`
 });
 
@@ -78,9 +78,23 @@ app.post('/api/password', auth, wrap(async (req, res) => {
 }));
 
 // ---------- Songs ----------
+// Library comes back in the user's saved custom order; songs not yet placed (new ones) come first, newest first.
 app.get('/api/songs', auth, wrap(async (req, res) => {
-  const list = await songs.find({ userId: req.uid }).sort({ createdAt: -1 }).toArray();
-  res.json(list.map(shape));
+  const [list, u] = await Promise.all([
+    songs.find({ userId: req.uid }).sort({ createdAt: -1 }).toArray(),
+    users.findOne({ _id: new ObjectId(req.uid) })
+  ]);
+  const idx = new Map(((u && u.order) || []).map((id, i) => [id, i]));
+  const placed = s => idx.has(s._id.toString());
+  const fresh = list.filter(s => !placed(s));
+  const kept = list.filter(placed).sort((a, b) => idx.get(a._id.toString()) - idx.get(b._id.toString()));
+  res.json([...fresh, ...kept].map(shape));
+}));
+
+app.put('/api/songs/order', auth, wrap(async (req, res) => {
+  const ids = [...new Set([].concat(req.body.ids || []).map(String))].slice(0, 5000);
+  await users.updateOne({ _id: new ObjectId(req.uid) }, { $set: { order: ids } });
+  res.json({ ok: true });
 }));
 
 app.post('/api/songs/upload', auth, upload.array('files', 20), wrap(async (req, res) => {
