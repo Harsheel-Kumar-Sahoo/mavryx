@@ -218,3 +218,9 @@ dialog::backdrop{background:rgba(10,14,24,.5);backdrop-filter:blur(3px)}
 .k{display:grid;grid-template-columns:96px 1fr;align-items:center;gap:.5rem;padding:.5rem .2rem;border-bottom:1px solid var(--line)}
 .k:last-child{border-bottom:0}
 kbd{font:600 .8rem "Plus Jakarta Sans",system-ui,sans-serif;background:var(--surface2);border:1px solid var(--line);border-bottom-width:2px;border-radius:7px;padding:.1rem .5rem;margin-right:.25rem;display:inline-block;min-width:26px;text-align:center}
+
+/* library reordering */
+#list li{position:relative;transition:background .2s,transform .18s cubic-bezier(.2,.8,.2,1)}
+#list li.drag{transition:none;z-index:3;background:var(--surface);box-shadow:0 12px 32px rgba(0,0,0,.3)}
+#list .qh{margin-left:.1rem;flex:none}
+.hint{color:var(--muted);font-size:.85rem;margin:-.4rem .3rem .8rem}
