@@ -71,9 +71,10 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => setT
 paint(); setTheme(themeNow());
 
 // ---------- State ----------
-let me = null, songs = [], curId = null, sort = 'new', query = '', shuffleOn = false, loop = 'off', signup = false;
-const sorters = { new: null, title: (a, b) => a.title.localeCompare(b.title), artist: (a, b) => a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title) };
-const sortLabels = { new: 'Newest first', title: 'Title A–Z', artist: 'Artist A–Z' };
+let me = null, songs = [], curId = null, sort = 'custom', query = '', shuffleOn = false, loop = 'off', signup = false;
+const sorters = { custom: null, new: (a, b) => new Date(b.createdAt) - new Date(a.createdAt), title: (a, b) => a.title.localeCompare(b.title), artist: (a, b) => a.artist.localeCompare(b.artist) || a.title.localeCompare(b.title) };
+const sortLabels = { custom: 'My order', new: 'Newest first', title: 'Title A–Z', artist: 'Artist A–Z' };
+try { const sv = localStorage.getItem('sort'); if (sv in sorters) sort = sv; } catch {}
 const sorted = () => { const l = [...songs]; if (sorters[sort]) l.sort(sorters[sort]); return l; };
 const shown = () => { const q = query.toLowerCase(); return sorted().filter(s => !q || (s.title + ' ' + s.artist).toLowerCase().includes(q)); };
 const hue = s => { let h = 0; for (const c of s.title + s.artist) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
@@ -141,7 +142,7 @@ document.addEventListener('click', e => {
 menu.onclick = e => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   const act = b.dataset.act;
-  if (act === 'sort') { sort = sort === 'new' ? 'title' : sort === 'title' ? 'artist' : 'new'; render(); renderQueue(); return; }
+  if (act === 'sort') { const modes = Object.keys(sorters); sort = modes[(modes.indexOf(sort) + 1) % modes.length]; try { localStorage.setItem('sort', sort); } catch {} render(); renderQueue(); return; }
   closeMenu();
   ({ profile: openProfile, queue: openQueue, install: installApp, controls: openControls, upload: () => $('#file').click(), link: openLink, password: openPassword, logout })[act]();
 };
@@ -149,12 +150,18 @@ menu.onclick = e => {
 // ---------- Library ----------
 function render() {
   const list = shown();
+  const canDrag = sort === 'custom' && !query && songs.length > 1;
   const pos = {}; queue.forEach((q, i) => { if (!pos[q.id]) pos[q.id] = i + 1; });
   $('#sort-label').textContent = 'Sort: ' + sortLabels[sort];
   $('#count').textContent = songs.length ? `${songs.length} song${songs.length > 1 ? 's' : ''}` : '';
   $('#empty').hidden = songs.length > 0;
+  const hint = $('#sort-hint'); hint.hidden = songs.length < 2;
+  hint.innerHTML = sort === 'custom'
+    ? (query ? 'Clear the search to reorder your songs.' : 'Drag the handle to arrange your songs. Playback follows this order.')
+    : `Sorted: ${sortLabels[sort]}. <button class="link" id="to-custom" type="button">Switch to My order</button> to reorder.`;
   $('#list').innerHTML = list.map(s => `
     <li class="${s.id === curId ? 'on' : ''}">
+      ${canDrag ? `<button class="icon-btn qh" data-grip aria-label="Reorder ${esc(s.title)}. Drag, or use the up and down arrow keys.">${svg('grip')}</button>` : ''}
       <button class="row-main" data-play="${s.id}">
         <span class="art" style="${artBg(s)}"><span class="ltr">${esc(s.title[0] || '♪').toUpperCase()}</span><span class="eq"><i></i><i></i><i></i></span></span>
         <span class="meta"><b>${esc(s.title)}</b><small>${esc(s.artist)}${pos[s.id] ? `<span class="qchip">Queue #${pos[s.id]}</span>` : ''}</small></span>
@@ -169,6 +176,27 @@ $('#list').onclick = e => {
   if (p) return p.dataset.play === curId ? toggle() : playId(p.dataset.play);
   if (m) openRowMenu(m);
 };
+// Reorder songs in the library (My order)
+$('#list').addEventListener('pointerdown', e => dragSort(e, $('#list'), null, moveSong));
+$('#list').addEventListener('keydown', e => {
+  const h = e.target.closest('[data-grip]'); if (!h || !/^Arrow(Up|Down)$/.test(e.key)) return;
+  e.preventDefault();
+  const id = h.closest('li').querySelector('[data-play]').dataset.play;
+  const i = songs.findIndex(s => s.id === id), t = i + (e.key === 'ArrowUp' ? -1 : 1);
+  if (t < 0 || t >= songs.length) return;
+  moveSong(i, t); $(`#list [data-play="${id}"]`).closest('li').querySelector('[data-grip]').focus();
+});
+$('#sort-hint').onclick = e => {
+  if (!e.target.closest('#to-custom')) return;
+  sort = 'custom'; try { localStorage.setItem('sort', sort); } catch {} render(); renderQueue();
+};
+function moveSong(a, b) { songs.splice(b, 0, songs.splice(a, 1)[0]); saveOrder(); render(); renderQueue(); }
+let orderT;
+function saveOrder() {
+  clearTimeout(orderT);
+  orderT = setTimeout(() => api('/api/songs/order', { method: 'PUT', json: { ids: songs.map(s => s.id) } })
+    .catch(() => toast('Could not save the new order', 'err')), 400);
+}
 async function removeSong(id) {
   const s = songs.find(x => x.id === id);
   if (!s || !confirm(`Remove "${s.title}" from your library?`)) return;
@@ -379,18 +407,18 @@ $('#q-lib').onclick = e => {
   if (a) qAdd(a.dataset.qadd, false); else if (p) playId(p.dataset.qlib);
 };
 
-// Drag to reorder (pointer events: works with mouse and touch)
-$('#q-list').addEventListener('pointerdown', e => {
+// Drag to reorder any list (pointer events: works with mouse and touch). onDrop(fromIndex, toIndex)
+function dragSort(e, ul, scrollSel, onDrop) {
   const h = e.target.closest('[data-grip]'); if (!h) return;
   e.preventDefault(); h.setPointerCapture(e.pointerId);
-  const li = h.closest('li'), items = [...$('#q-list').children], body = $('.q-body');
-  const i0 = items.indexOf(li), n = items.length, y0 = e.clientY, sc0 = body.scrollTop;
+  const li = h.closest('li'), items = [...ul.children], sc = scrollSel ? $(scrollSel) : document.scrollingElement;
+  const i0 = items.indexOf(li), n = items.length, y0 = e.clientY, s0 = sc.scrollTop;
   const H = n > 1 ? items[1].offsetTop - items[0].offsetTop : li.offsetHeight;
   let t = i0; li.classList.add('drag');
   const move = ev => {
-    const r = body.getBoundingClientRect();
-    if (ev.clientY < r.top + 60) body.scrollTop -= 12; else if (ev.clientY > r.bottom - 60) body.scrollTop += 12;
-    const dy = ev.clientY - y0 + (body.scrollTop - sc0);
+    const vp = scrollSel ? sc.getBoundingClientRect() : { top: 70, bottom: innerHeight - 110 };
+    if (ev.clientY < vp.top + 50) sc.scrollTop -= 12; else if (ev.clientY > vp.bottom - 50) sc.scrollTop += 12;
+    const dy = ev.clientY - y0 + (sc.scrollTop - s0);
     li.style.transform = `translateY(${dy}px)`;
     t = Math.max(0, Math.min(n - 1, Math.round(i0 + dy / H)));
     items.forEach((el, j) => {
@@ -401,10 +429,11 @@ $('#q-list').addEventListener('pointerdown', e => {
   const end = () => {
     h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', end); h.removeEventListener('pointercancel', end);
     items.forEach(el => el.style.transform = ''); li.classList.remove('drag');
-    if (t !== i0) { queue.splice(t, 0, queue.splice(i0, 1)[0]); qChanged(); }
+    if (t !== i0) onDrop(i0, t);
   };
   h.addEventListener('pointermove', move); h.addEventListener('pointerup', end); h.addEventListener('pointercancel', end);
-});
+}
+$('#q-list').addEventListener('pointerdown', e => dragSort(e, $('#q-list'), '.q-body', (a, b) => { queue.splice(b, 0, queue.splice(a, 1)[0]); qChanged(); }));
 $('#q-list').addEventListener('keydown', e => {   // keyboard reorder
   const h = e.target.closest('[data-grip]'); if (!h || !/^Arrow(Up|Down)$/.test(e.key)) return;
   e.preventDefault();
